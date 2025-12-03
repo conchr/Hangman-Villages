@@ -1,0 +1,1355 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Παιχνίδι Κρεμάλα</title>
+    <style>
+        /* CSS VARIABLES ΓΙΑ ΕΥΕΛΙΞΙΑ */
+        :root {
+            --hangman-width: 100px;
+            --hangman-height: 207px;
+            --animation-duration: 1.5s;
+            --wrapper-left: 48.87%;
+            --wrapper-top: 22.815%;
+            --color-blue: blue;
+            --color-green: green;
+            --color-red: red;
+            --color-orange: orange;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #f0f0f0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        #splashScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            z-index: 1000;
+            transition: opacity 1.5s ease-in-out;
+            opacity: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .splash-content {
+            position: relative;
+            width: 100%;
+            max-width: 799px;
+            height: 100%;
+            max-height: 799px;
+            background-image: url('https://raw.githubusercontent.com/conchr/Hangman-Original/main/Hangman%20Background.jpg');
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .splash-text {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            font-size: 60px; /* Μείωση από 96px σε 60px */
+            font-weight: bold;
+            color: #ffffff;
+            text-shadow: 4px 4px 8px rgba(0, 0, 0, 0.7);
+            text-align: center;
+            animation: splashColorChange 2s infinite alternate;
+            margin-bottom: 20px; /* Μείωση από 100px σε 20px */
+        }
+        
+        .splash-subtitle {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            font-size: 28px;
+            font-weight: bold;
+            color: #ffffff; /* Σταθερό χρώμα */
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            text-align: center;
+            margin-top: 10px;
+            /* Χωρίς animation για αλλαγή χρώματος */
+        }
+        
+        @keyframes splashColorChange {
+            0% { color: #ff0000; }
+            25% { color: #ffff00; }
+            50% { color: #00ff00; }
+            75% { color: #00ffff; }
+            100% { color: #ff00ff; }
+        }
+        
+        .image-container {
+            position: relative;
+            width: 100%;
+            max-width: 799px;
+            overflow: hidden; 
+            opacity: 0;
+            transition: opacity 1.5s ease-in-out;
+        }
+        
+        .background-image {
+            display: block;
+            width: 100%;
+            height: auto;
+            position: relative;
+            z-index: 1;
+        }
+        
+        /* ΣΤΑΤΙΚΕΣ ΠΕΡΙΟΧΕΣ */
+        .fixed-area {
+            position: absolute;
+            box-sizing: border-box;
+            pointer-events: none;
+        }
+        
+        .container-area {
+            border: 3px solid var(--color-blue); 
+            z-index: 5;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .letters-area {
+            border: 3px dashed var(--color-green);
+            z-index: 6;
+        }
+        
+        .alphabet-area {
+            border: 3px dashed var(--color-red);
+            z-index: 7;
+        }
+        
+        .score-area {
+            border: 3px dashed var(--color-orange);
+            z-index: 8;
+        }
+
+        /* WRAPPER ΤΟΥ ΚΡΕΜΑΣΜΕΝΟΥ */
+        .hanged-man-wrapper {
+            position: absolute;
+            width: var(--hangman-width);
+            height: var(--hangman-height);
+            z-index: 10;
+            pointer-events: none;
+            left: var(--wrapper-left);
+            top: var(--wrapper-top);
+            transform: rotate(0deg);
+            transform-origin: 47% 22%;
+        }
+
+        /* ANIMATIONS ΓΙΑ ΤΑΛΑΝΤΩΣΗ */
+        @keyframes swingInitial {
+            0% { transform: rotate(0deg); }
+            50% { transform: rotate(5deg); }
+            100% { transform: rotate(0deg); }
+        }
+
+        @keyframes swing {
+            0% { transform: rotate(-15deg); }
+            50% { transform: rotate(15deg); }
+            100% { transform: rotate(-15deg); }
+        }
+
+        .swinging-initial {
+            animation: swingInitial 0.5s ease-in-out 1;
+        }
+
+        .swinging {
+            animation: swing 1s ease-in-out infinite;
+        }
+
+        /* ΜΕΡΗ ΤΟΥ ΚΡΕΜΑΣΜΕΝΟΥ */
+        .hanged-man-part {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: url('https://github.com/conchr/Hangman-Original/raw/main/Hangman%20Hanged.png');
+            background-size: 100% 100%; 
+            background-repeat: no-repeat;
+            display: none; 
+            opacity: 0;
+            animation: fadeIn var(--animation-duration) ease-in-out forwards;
+        }
+
+        /* CSS ANIMATION ΓΙΑ ΤΟ FADE IN */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Κείμενο ΕΧΑΣΕΣ */
+        .lost-text {
+            position: absolute;
+            right: 20px;
+            top: calc(50% - 100px);
+            transform: translateY(-50%);
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            font-size: 48px;
+            font-weight: bold;
+            display: none;
+            z-index: 20;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .lost-text span {
+            animation: colorChange 1.5s infinite alternate;
+        }
+
+        .lost-text span:nth-child(1) { animation-delay: 0.0s; }
+        .lost-text span:nth-child(2) { animation-delay: 0.2s; }
+        .lost-text span:nth-child(3) { animation-delay: 0.4s; }
+        .lost-text span:nth-child(4) { animation-delay: 0.6s; }
+        .lost-text span:nth-child(5) { animation-delay: 0.8s; }
+        .lost-text span:nth-child(6) { animation-delay: 1.0s; }
+
+        /* Κείμενο ΝΙΚΗΣΕΣ */
+        .win-text {
+            position: absolute;
+            right: 20px;
+            top: calc(50% - 100px);
+            transform: translateY(-50%);
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            font-size: 48px;
+            font-weight: bold;
+            display: none;
+            z-index: 20;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .win-text span {
+            animation: colorChange 1.5s infinite alternate;
+        }
+
+        .win-text span:nth-child(1) { animation-delay: 0.0s; }
+        .win-text span:nth-child(2) { animation-delay: 0.2s; }
+        .win-text span:nth-child(3) { animation-delay: 0.4s; }
+        .win-text span:nth-child(4) { animation-delay: 0.6s; }
+        .win-text span:nth-child(5) { animation-delay: 0.8s; }
+        .win-text span:nth-child(6) { animation-delay: 1.0s; }
+        .win-text span:nth-child(7) { animation-delay: 1.2s; }
+
+        @keyframes colorChange {
+            0% { color: #ff0000; }
+            25% { color: #ffff00; }
+            50% { color: #00ff00; }
+            75% { color: #00ffff; }
+            100% { color: #ff00ff; }
+        }
+
+        /* Fade Out Animation */
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+
+        .fade-out {
+            animation: fadeOut 2s ease-in-out forwards;
+        }
+
+        /* Win Image - ανέβασμα 50 pixels πιο ψηλά */
+        .win-image {
+            position: absolute;
+            width: 120px;
+            height: auto;
+            display: none;
+            z-index: 25;
+            opacity: 0;
+            left: calc(50% - 150px);
+            top: calc(50% + 0px); /* Αλλαγή από 50px σε 0px */
+            background: transparent;
+            image-rendering: -webkit-optimize-contrast;
+            image-rendering: crisp-edges;
+            filter: brightness(1.1) contrast(1.1);
+            mix-blend-mode: multiply;
+        }
+
+        .win-image.visible {
+            display: block;
+            opacity: 1;
+            transition: opacity 1.5s ease-in-out;
+        }
+
+        /* Νέα Animation για κίνηση προς τα δεξιά */
+        @keyframes moveRight {
+            from {
+                left: calc(50% - 150px);
+            }
+            to {
+                left: 100%;
+            }
+        }
+
+        .win-image.move-right {
+            animation: moveRight 8s ease-in-out forwards;
+        }
+
+        /* ΣΤΥΛ ΓΙΑ ΤΟ ΠΑΙΧΝΙΔΙ ΚΡΕΜΑΛΑ */
+        .word-display-container {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+            pointer-events: none;
+        }
+        
+        .word-display {
+            font-size: 24px;
+            letter-spacing: 12px;
+            font-weight: bold;
+            color: #ffffff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            text-align: center;
+            width: 100%;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .word-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: nowrap;
+            white-space: nowrap;
+        }
+        
+        /* Νέα κλάση για το scrolling κείμενο */
+        .scrolling-text-container {
+            position: absolute;
+            top: -50px;
+            left: 0;
+            width: 100%;
+            height: 60px;
+            overflow: hidden;
+            z-index: 30;
+        }
+        
+        .scrolling-text {
+            font-family: 'Comic Sans MS', cursive, sans-serif;
+            font-size: 36px;
+            font-weight: bold;
+            color: #ffffff;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+            white-space: nowrap;
+            position: absolute;
+            animation: scrollText 15s linear infinite;
+            padding: 10px 0;
+        }
+        
+        @keyframes scrollText {
+            0% {
+                transform: translateX(100%);
+            }
+            100% {
+                transform: translateX(-100%);
+            }
+        }
+        
+        .explanation-display {
+            font-size: 14px;
+            color: #ffffff;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+            text-align: center;
+            width: 100%;
+            line-height: 1.4;
+            padding: 10px;
+            display: none;
+            overflow-y: auto;
+            max-height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+        }
+        
+        .keyboard-container {
+            position: absolute;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+        }
+        
+        .keyboard {
+            display: grid;
+            grid-template-columns: repeat(12, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 4px;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .letter-btn {
+            font-size: 14px;
+            background: rgba(52, 152, 219, 0.9);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 5px;
+        }
+        
+        .letter-btn:hover {
+            background: rgba(41, 128, 185, 1);
+            transform: scale(1.05);
+        }
+        
+        .letter-btn:disabled {
+            background: rgba(189, 195, 199, 0.8);
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .letter-btn.correct {
+            background: rgba(39, 174, 96, 0.9);
+        }
+        
+        .letter-btn.wrong {
+            background: rgba(231, 76, 60, 0.9);
+        }
+        
+        .game-status {
+            position: absolute;
+            z-index: 2;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            min-width: 200px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .message {
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 0;
+            min-height: 30px;
+            color: #ffffff;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+            line-height: 1.3;
+            word-wrap: break-word;
+        }
+        
+        .win {
+            color: #2ecc71;
+        }
+        
+        .lose {
+            color: #e74c3c;
+        }
+        
+        .attempts {
+            font-size: 16px;
+            color: #f39c12;
+            font-weight: bold;
+            margin: 10px 0;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+        }
+        
+        .used-letters {
+            margin: 10px 0;
+            color: #ecf0f1;
+            font-size: 14px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+            line-height: 1.3;
+            word-wrap: break-word;
+            max-height: 80px;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .fade-in {
+            opacity: 1 !important;
+        }
+        
+        .fade-out {
+            opacity: 0 !important;
+        }
+
+        /* Κουμπιά τέλους παιχνιδιού */
+        .game-over-buttons {
+            position: absolute;
+            z-index: 30;
+            display: none;
+            flex-direction: column;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+        
+        .game-over-btn {
+            padding: 12px 24px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s;
+            min-width: 200px;
+            text-align: center;
+        }
+        
+        .play-again-btn {
+            background: rgba(46, 204, 113, 0.9);
+            color: white;
+        }
+        
+        .play-again-btn:hover {
+            background: rgba(39, 174, 96, 1);
+            transform: scale(1.05);
+        }
+        
+        .return-btn {
+            background: rgba(155, 89, 182, 0.9);
+            color: white;
+        }
+        
+        .return-btn:hover {
+            background: rgba(142, 68, 173, 1);
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div id="splashScreen">
+        <div class="splash-content">
+            <div class="splash-text">ΚΡΕΜΑΛΑ</div>
+            <div class="splash-subtitle">Μάθε τα Χωριά της Επαρχίας</div>
+        </div>
+    </div>
+
+    <div class="image-container" id="imageContainer">
+        <!-- Εικόνα Φόντου (Κενή Κρεμάλα) -->
+        <img src="https://raw.githubusercontent.com/conchr/Hangman-Original/main/Hangman%20Background.jpg" 
+             alt="Hangman Background" class="background-image" id="backgroundImage">
+
+        <!-- WRAPPER ΓΙΑ ΤΟΝ ΚΡΕΜΑΣΜΕΝΟΥ -->
+        <div class="hanged-man-wrapper" id="hangmanWrapper">
+            <!-- Σταθερό Σημείο Σύνδεσης -->
+            <div id="fixedBeamPart" class="hanged-man-part" data-error="Fixed"></div>
+
+            <!-- 7 ΜΕΡΗ ΤΟΥ ΣΩΜΑΤΟΣ -->
+            <div id="ropePart" class="hanged-man-part" data-error="Error 1"></div>
+            <div id="headPart" class="hanged-man-part" data-error="Error 2"></div>
+            <div id="bodyPart" class="hanged-man-part" data-error="Error 3"></div>
+            <div id="rightHandPart" class="hanged-man-part" data-error="Error 4"></div>
+            <div id="leftHandPart" class="hanged-man-part" data-error="Error 5"></div>
+            <div id="rightFootPart" class="hanged-man-part" data-error="Error 6"></div>
+            <div id="leftFootPart" class="hanged-man-part" data-error="Error 7"></div>
+        </div>
+
+        <!-- Scrolling Text για τη λέξη -->
+        <div class="scrolling-text-container" id="scrollingTextContainer">
+            <div class="scrolling-text" id="scrollingText"></div>
+        </div>
+
+        <!-- Εμφάνιση Λέξης και Επεξήγησης -->
+        <div class="word-display-container" id="wordDisplayContainer">
+            <div class="word-display" id="wordDisplay"></div>
+            <div class="explanation-display" id="explanationDisplay"></div>
+        </div>
+
+        <!-- Πληκτρολόγιο -->
+        <div class="keyboard-container" id="keyboardContainer">
+            <div class="keyboard" id="keyboard">
+                <!-- Τα κουμπιά θα προστεθούν αυτόματα από το JavaScript -->
+            </div>
+        </div>
+
+        <!-- Πληροφορίες Παιχνιδιού -->
+        <div class="game-status" id="gameStatus">
+            <div class="attempts">Προσπάθειες: <span id="attempts">7</span></div>
+            <div class="message" id="message"></div>
+            <div class="used-letters">
+                Χρησιμοποιημένα γράμματα: <span id="usedLetters"></span>
+            </div>
+        </div>
+
+        <!-- Κουμπιά τέλους παιχνιδιού -->
+        <div class="game-over-buttons" id="gameOverButtons">
+            <button class="game-over-btn play-again-btn" onclick="playAgain()">Παίξε Πάλι</button>
+            <button class="game-over-btn return-btn" onclick="returnToGames()">Επιστροφή</button>
+        </div>
+
+        <!-- Κείμενο ΕΧΑΣΕΣ -->
+        <div class="lost-text" id="lostText">
+            <span>Ε</span><span>Χ</span><span>Α</span><span>Σ</span><span>Ε</span><span>Σ</span>
+        </div>
+
+        <!-- Κείμενο ΝΙΚΗΣΕΣ -->
+        <div class="win-text" id="winText">
+            <span>Ν</span><span>Ι</span><span>Κ</span><span>Η</span><span>Σ</span><span>Ε</span><span>Σ</span>
+        </div>
+
+        <!-- Win Image -->
+        <img src="https://github.com/conchr/Hangman-Original/raw/main/Hangman%20run.gif" 
+             alt="Win Celebration" class="win-image" id="winImage">
+
+        <!-- ΣΤΑΤΙΚΕΣ ΠΕΡΙΟΧΕΣ -->
+        <div class="fixed-area container-area" id="containerArea"></div>
+        <div class="fixed-area letters-area" id="lettersArea"></div>
+        <div class="fixed-area alphabet-area" id="alphabetArea"></div>
+        <div class="fixed-area score-area" id="scoreArea"></div>
+    </div>
+
+    <script>
+        // ΣΤΑΘΕΡΕΣ ΚΑΙ ΜΕΤΑΒΛΗΤΕΣ ΠΑΙΧΝΙΔΙΟΥ
+        const HANGMAN_WIDTH_REF = 100;
+        const HANGMAN_HEIGHT_REF = 207;
+        
+        // Λέξεις με τις αντίστοιχες επεξηγήσεις
+        const wordData = [
+            {
+                word: "Άγιος Γεώργιος Φαρσάλων",
+                explanation: "Παλιά ονομασία: Κουτουκλάρ (Kütükler). Σημασία: Σημαίνει «Κούτσουρα» ή «Κορμοί δέντρων» (Kütük = κούτσουρο), πιθανόν λόγω υλοτομίας στην περιοχή."
+            },
+            {
+                word: "Άγιος Κωνσταντίνος",
+                explanation: "Παλιά ονομασία: Χατζήμπεη (Hacıbey). Σημασία: «Ο Χατζής Μπέης» (Τίτλος τιμής: Χατζής είναι ο προσκυνητής της Μέκκας και Μπέης ο άρχοντας/αξιωματούχος)."
+            },
+            {
+                word: "Αμπελιά",
+                explanation: "Παλιά ονομασία: Δερεκλί (Derekli). Σημασία: «Το χωριό στο ρέμα» ή «Αυτό που έχει ρέματα» (Dere = ρέμα)."
+            },
+            {
+                word: "Ανωχώρι",
+                explanation: "Παλιά ονομασία: Άνω Τσιαχμάτι. Σημασία: Άγνωστη ετυμολογία (πιθανόν παραφθορά ονόματος μπέη ή τοπικού ιδιώματος)."
+            },
+            {
+                word: "Ασπρόγεια",
+                explanation: "Παλιά ονομασία: Ιρινί ή Τεκές Ιρινί. Σημασία: Αναφέρεται στον Τεκέ (μοναστήρι των Μπεκτασήδων δερβίσηδων) που υπήρχε εκεί. Το «Ιρινί» πιθανόν είναι όνομα ή τοπωνύμιο."
+            },
+            {
+                word: "Αχιλλείο",
+                explanation: "Παλιά ονομασία: Δουβλατάν (Douvlatan). Σημασία: Δεν είναι τουρκική λέξη. Πιθανότατα σλαβικής ή βλάχικης προέλευσης, σχετιζόμενη με τη λέξη για την «πολιτεία» ή την «εξουσία» (Devlet στα τουρκικά, αλλά η κατάληξη -an θυμίζει περσική/σλαβική επιρροή)."
+            },
+            {
+                word: "Βαμβακού",
+                explanation: "Παλιά ονομασία: Μπαϊρακλί (Bayraklı). Σημασία: «Σημαιοφόρος» ή «Τόπος με σημαία» (Bayrak = σημαία). Συνήθως έδρα φρουράς."
+            },
+            {
+                word: "Βασιλικά",
+                explanation: "Παλιά ονομασία: Σακάλαρ (Sakalar). Σημασία: «Οι Νεροκουβαλητές» (Saka = νερουλάς, μεταφορέας νερού στον στρατό)."
+            },
+            {
+                word: "Βρυσιά",
+                explanation: "Παλιά ονομασία: Μπαλακλί (Balakli). Σημασία: Είτε «Το χωριό με τα βουβάλια/μοσχάρια» (Balak = μικρό βουβάλι) είτε παραφθορά του Balıklı («Ψαράδικα»)."
+            },
+            {
+                word: "Δασόλοφος",
+                explanation: "Παλιά ονομασία: Μπεκήδες (Bekides). Σημασία: «Οι Μπέηδες» (Πληθυντικός του Μπέης = Άρχοντας/Διοικητής)."
+            },
+            {
+                word: "Δένδρα",
+                explanation: "Παλιά ονομασία: Σιατερλί. Σημασία: Αβέβαιη (πιθανόν παραφθορά του Seterli = αυτός που έχει κάλυμμα/πέπλο;)."
+            },
+            {
+                word: "Δίλοφος",
+                explanation: "Παλιά ονομασία: Χατζηαμάρ. Σημασία: «Ο Χατζής Ομάρ» (Ονομασία ιδιοκτήτη τσιφλικιού)."
+            },
+            {
+                word: "Ερέτρια",
+                explanation: "Παλιά ονομασία: Τσαγκλί ή Τζανλί (Çanglı/Canlı). Σημασία: «Ζωντανός/Ψυχωμένος» (Canlı) ή «Αυτό που έχει καμπάνα/κουδούνι» (Çan)."
+            },
+            {
+                word: "Ευύδριο (Μεγάλο)",
+                explanation: "Παλιά ονομασία: Γουσγουνάρια (Gusgunari). Σημασία: Προέρχεται από το τουρκικό Kuşkonar που σημαίνει «Εκεί που προσγειώνονται τα πουλιά» ή από τη λέξη Kuşkun που είναι το εξάρτημα της σέλας (υπόρινο) του αλόγου."
+            },
+            {
+                word: "Ζωοδόχος Πηγή",
+                explanation: "Παλιά ονομασία: Τατάρ (Tatar). Σημασία: «Τάταρος». Αναφορά στην εθνότητα των Τατάρων (πιθανόν μισθοφόροι ή έποικοι από την Κριμαία/Ανατολή)."
+            },
+            {
+                word: "Θετίδιο",
+                explanation: "Παλιά ονομασία: Αλχανί. Σημασία: Πιθανόν «Το Χάνι του Αλή» (Ali Hani) ή «Κόκκινο Χάνι» (Al = κόκκινο + Han)."
+            },
+            {
+                word: "Καλλιθέα",
+                explanation: "Παλιά ονομασία: Κουλούρι. Σημασία: Περιγραφικό όνομα λόγω σχήματος λόφου ή τοποθεσίας."
+            },
+            {
+                word: "Κάτωχωρι",
+                explanation: "Παλιά ονομασία: Κάτω Τσιαχμάτι. Σημασία: Βλ. Ανωχώρι."
+            },
+            {
+                word: "Κρήνη",
+                explanation: "Παλιά ονομασία: Δρίσκολη. Σημασία: Πιθανότατα αρβανίτικης ή σλαβικής ρίζας, δεν έχει προφανή τουρκική ερμηνεία."
+            },
+            {
+                word: "Λόφος",
+                explanation: "Παλιά ονομασία: Τζαμαλί (Camali). Σημασία: Προέρχεται από το όνομα «Τζεμάλ» (Cemal = ομορφιά/χάρη) ή σχετίζεται με το «Τζαμί» (Cami)."
+            },
+            {
+                word: "Ναρθάκι",
+                explanation: "Παλιά ονομασία: Κιογκιόζ (Göygöz). Σημασία: «Γαλανομάτης» (Gök = ουρανός/μπλε, Göz = μάτι). Επίσης σημαίνει και «ματιασμένος» ή «αλληθωρος» σε διαλέκτους."
+            },
+            {
+                word: "Νεράιδα",
+                explanation: "Παλιά ονομασία: Κινηκλί ή Κεσερλί. Σημασία: Το Κεσερλί (Keserli) σημαίνει «Αυτός που κόβει» (από το keser = σκεπάρνι) ή περιοχή με απότομες τομές."
+            },
+            {
+                word: "Ξυλάδες",
+                explanation: "Παλιά ονομασία: Γενιτσαροχώρι. Σημασία: «Το χωριό των Γενιτσάρων» (του επίλεκτου σώματος του οθωμανικού στρατού)."
+            },
+            {
+                word: "Παλαιόμυλος",
+                explanation: "Παλιά ονομασία: Ινελί (İneli). Σημασία: «Αυτό που έχει σπηλιά» (İn = σπηλιά/φωλιά) ή «Βελονωτό» (İğneli)."
+            },
+            {
+                word: "Πολυδάμειο",
+                explanation: "Παλιά ονομασία: Καραμπαϊράμ. Σημασία: «Μαύρο Μπαϊράμι» (Kara = μαύρος, Bayram = γιορτή). Πιθανόν συνδέεται με κάποιο δυσάρεστο γεγονός που συνέβη μέρα γιορτής."
+            },
+            {
+                word: "Πολυνέρι",
+                explanation: "Παλιά ονομασία: Σιμικλί (Semikli / Simekli). Σημασία: Ασαφής. Αν προέρχεται από το Semiz σημαίνει «Παχύς/Γεμάτος»."
+            },
+            {
+                word: "Ρευματιά",
+                explanation: "Παλιά ονομασία: Τσατμάς (Çatma). Σημασία: Σημαίνει «Σκελετός» (κτιρίου), «Κατασκευή» ή «Συνάντηση» (π.χ. δύο ρεμάτων). Επίσης αναφέρεται στον τρόπο χτισίματος των τοίχων με καλάμια και λάσπη."
+            },
+            {
+                word: "Ρήγαιο",
+                explanation: "Παλιά ονομασία: Αϊβαλί (Ayvalı). Σημασία: «Κυδωνιές» ή «Τόπος με κυδώνια» (Ayva = κυδώνι)."
+            },
+            {
+                word: "Σιτόχωρο",
+                explanation: "Παλιά ονομασία: Λαζαρμπούγα. Σημασία: Σύνθετη λέξη. «Λάζαρος» + «Μπουγάς» (Boğa = Ταύρος). Πιθανόν παρωνύμιο κάποιου ισχυρού ντόπιου."
+            },
+            {
+                word: "Σκοπιά",
+                explanation: "Παλιά ονομασία: Ταμπακλί (Tabakli). Σημασία: «Βυρσοδεψεία» ή «Τόπος των βυρσοδεψών» (Tabak = βυρσοδέψης)."
+            },
+            {
+                word: "Σκοτούσσα",
+                explanation: "Παλιά ονομασία: Κουλαξίζ (Kulaksız). Σημασία: «Χωρίς αυτιά» (Kulak = αυτί, -sız = χωρίς). Χρησιμοποιούνταν για να περιγράψει κάτι ατελές ή ως παρατσούκλι."
+            },
+            {
+                word: "Σταυρός",
+                explanation: "Παλιά ονομασία: Δεμερλί (Demirli). Σημασία: «Σιδερένιος» ή «Αγκυροβολημένος» (Demir = σίδερο). Αναφέρεται συχνά σε τοποθεσίες με σιδηροδρομική γραμμή (σιδηρόδρομος) ή γέφυρα."
+            },
+            {
+                word: "Υπέρεια",
+                explanation: "Παλιά ονομασία: Κετσελί ή Κισλάρ. Σημασία: Κετσελί (Keçeli) = «Αυτός που φοράει τσόχα/κετσέ» ή «Αυτός που έχει κατσίκια» (Keçi). Το Κισλάρ (Kışlar) σημαίνει «Χειμαδιά»."
+            },
+            {
+                word: "Χαλκιάδες",
+                explanation: "Παλιά ονομασία: Καραδεμερτζή (Karademirci). Σημασία: «Ο Μαύρος Σιδηρουργός» (Kara = μαύρος, Demirci = σιδεράς)."
+            },
+            {
+                word: "Φάρσαλα (Πόλη)",
+                explanation: "Παλιά ονομασία: Τσάταλτζα (Çatalca). Σημασία: «Δίχαλο» ή «Διχαλωτή». Οφείλεται στη μορφολογία του εδάφους ή στο ότι η πόλη απλωνόταν ανάμεσα σε δύο υψώματα (Προφήτης Ηλίας και Κάστρο)."
+            }
+        ];
+
+        // Ελληνικό αλφάβητο (χωρίς τόνους)
+        const greekAlphabet = 'αβγδεζηθικλμνξοπρστυφχψω';
+
+        // Στοιχεία DOM
+        const lettersArea = document.getElementById('lettersArea');
+        const alphabetArea = document.getElementById('alphabetArea');
+        const scoreArea = document.getElementById('scoreArea');
+        const backgroundImage = document.getElementById('backgroundImage');
+        const imageContainer = document.getElementById('imageContainer');
+        const hangmanWrapper = document.getElementById('hangmanWrapper');
+        const lostText = document.getElementById('lostText');
+        const winText = document.getElementById('winText');
+        const winImage = document.getElementById('winImage');
+        const scrollingTextContainer = document.getElementById('scrollingTextContainer');
+        const scrollingText = document.getElementById('scrollingText');
+        
+        // Στοιχεία από το παιχνίδι κρεμάλα
+        const wordDisplay = document.getElementById('wordDisplay');
+        const explanationDisplay = document.getElementById('explanationDisplay');
+        const message = document.getElementById('message');
+        const attempts = document.getElementById('attempts');
+        const usedLetters = document.getElementById('usedLetters');
+        const keyboard = document.getElementById('keyboard');
+        const splashScreen = document.getElementById('splashScreen');
+        const wordDisplayContainer = document.getElementById('wordDisplayContainer');
+        const keyboardContainer = document.getElementById('keyboardContainer');
+        const gameStatus = document.getElementById('gameStatus');
+        const gameOverButtons = document.getElementById('gameOverButtons');
+
+        // ΚΑΤΑΣΤΑΣΗ ΠΑΙΧΝΙΔΙΟΥ
+        let gameState = {
+            currentError: 0,
+            maxErrors: 7,
+            isPlaying: false,
+            isSwinging: false,
+            hasWon: false,
+            hasLost: false,
+            selectedWordData: null,
+            selectedWord: '',
+            selectedWordNormalized: '',
+            guessedLetters: [],
+            wrongAttempts: 0,
+            gameOver: false
+        };
+
+        // Λίστα για παρακολούθηση χρησιμοποιημένων λέξεων
+        let usedWordIndices = [];
+        let availableIndices = [...Array(wordData.length).keys()]; // [0, 1, 2, ..., 34]
+
+        // ΒΕΛΤΙΩΜΕΝΕΣ ΣΥΝΤΕΤΑΓΜΕΝΕΣ ΓΙΑ ΤΑ ΜΕΡΗ ΤΟΥ HANGMAN
+        const hangmanCoordinates = {
+            container2: { x1: 0, y1: 2, x2: 99, y2: 207, type: 'rect' },
+            fixedBeam: { x1: 40, y1: 0, x2: 60, y2: 35, type: 'rect' }, 
+            rope: { x1: 31, y1: 35, x2: 67, y2: 80, type: 'rect' },
+            center: { x: 47, y: 22, radius: 1, type: 'circle' }, 
+            head: { x1: 23, y1: 73, x2: 81, y2: 110, type: 'rect' },
+            body: { x1: 43, y1: 106, x2: 57, y2: 146, type: 'rect' },
+            rightHand: { x1: 56, y1: 98, x2: 95, y2: 156, type: 'rect' },
+            leftHand: { x1: 5, y1: 98, x2: 47, y2: 156, type: 'rect' },
+            rightFoot: { x1: 47, y1: 140, x2: 76, y2: 198, type: 'rect' },
+            leftFoot: { x1: 22, y1: 138, x2: 49, y2: 198, type: 'rect' }
+        };
+
+        // ΧΑΡΤΟΓΡΑΦΗΣΗ ΜΕΡΩΝ ΣΕ IDs
+        const partElementIds = {
+            fixedBeam: 'fixedBeamPart', 
+            rope: 'ropePart',
+            head: 'headPart',
+            body: 'bodyPart',
+            rightHand: 'rightHandPart',
+            leftHand: 'leftHandPart',
+            rightFoot: 'rightFootPart',
+            leftFoot: 'leftFootPart'
+        };
+
+        // ΑΚΟΛΟΥΘΙΑ ΣΦΑΛΜΑΤΩΝ
+        const errorPartsSequence = [
+            'ropePart',      // Error 1
+            'headPart',      // Error 2
+            'bodyPart',      // Error 3
+            'rightHandPart', // Error 4
+            'leftHandPart',  // Error 5
+            'rightFootPart', // Error 6
+            'leftFootPart'   // Error 7
+        ];
+        
+        // ΣΥΝΤΕΤΑΓΜΕΝΕΣ ΓΙΑ ΣΤΑΤΙΚΕΣ ΠΕΡΙΟΧΕΣ
+        const originalCoordinates = {
+            container: { x1: 1, y1: -1, x2: 799, y2: 799 },
+            letters: { x1: 211, y1: 367, x2: 785, y2: 638 },
+            alphabet: { x1: 16, y1: 675, x2: 786, y2: 786 },
+            score: { x1: 14, y1: 13, x2: 348, y2: 169 }
+        };
+
+        // ΒΟΗΘΗΤΙΚΕΣ ΣΥΝΑΡΤΗΣΕΙΣ
+        function normalizeGreekText(text) {
+            return text
+                .toLowerCase()
+                .replace(/[άἀἁἂἃἄἅἆἇὰάᾀᾁᾂᾃᾄᾅᾆᾇᾰᾱᾲᾳᾴᾶᾷ]/g, 'α')
+                .replace(/[έἐἑἒἓἔἕὲέ]/g, 'ε')
+                .replace(/[ήἠἡἢἣἤἥἦἧὴήᾐᾑᾒᾓᾔᾕᾖᾗῂῃῄῆῇ]/g, 'η')
+                .replace(/[ίἰἱἲἳἴἵὶίϊΐῐῑῒΐῖῗ]/g, 'ι')
+                .replace(/[όὀὁὂὃὄὅὸό]/g, 'ο')
+                .replace(/[ύὐὑὒὓὔὕὖὗὺύϋΰῠῡῢΰῦῧ]/g, 'υ')
+                .replace(/[ώὠὡὢὣὤὥὦὧὼώᾠᾡᾢᾣᾤᾥᾦᾧῲῳῴῶῷ]/g, 'ω')
+                .replace(/ς/g, 'σ');
+        }
+
+        function getClipPathForCoord(coord) {
+            if (coord.type === 'rect') {
+                const x1 = (coord.x1 / HANGMAN_WIDTH_REF) * 100;
+                const y1 = (coord.y1 / HANGMAN_HEIGHT_REF) * 100;
+                const x2 = (coord.x2 / HANGMAN_WIDTH_REF) * 100;
+                const y2 = (coord.y2 / HANGMAN_HEIGHT_REF) * 100;
+                
+                return `polygon(${x1}% ${y1}%, ${x2}% ${y1}%, ${x2}% ${y2}%, ${x1}% ${y2}%)`;
+            }
+            return 'none';
+        }
+
+        function calculateRelativePercentages() {
+            const containerWidth = originalCoordinates.container.x2 - originalCoordinates.container.x1;
+            const containerHeight = originalCoordinates.container.y2 - originalCoordinates.container.y1;
+            
+            const calculateAreaPercentages = (area) => {
+                return {
+                    left: ((area.x1 - originalCoordinates.container.x1) / containerWidth) * 100,
+                    top: ((area.y1 - originalCoordinates.container.y1) / containerHeight) * 100,
+                    width: ((area.x2 - area.x1) / containerWidth) * 100,
+                    height: ((area.y2 - area.y1) / containerHeight) * 100
+                };
+            };
+            
+            return {
+                letters: calculateAreaPercentages(originalCoordinates.letters),
+                alphabet: calculateAreaPercentages(originalCoordinates.alphabet),
+                score: calculateAreaPercentages(originalCoordinates.score)
+            };
+        }
+        
+        function applyRelativePercentages() {
+            const percentages = calculateRelativePercentages();
+            
+            applyAreaStyles(lettersArea, percentages.letters);
+            applyAreaStyles(alphabetArea, percentages.alphabet);
+            applyAreaStyles(scoreArea, percentages.score);
+            
+            hangmanWrapper.style.width = HANGMAN_WIDTH_REF + 'px'; 
+            hangmanWrapper.style.height = HANGMAN_HEIGHT_REF + 'px';
+
+            const centerCoord = hangmanCoordinates.center;
+            const originXPercent = (centerCoord.x / HANGMAN_WIDTH_REF) * 100;
+            const originYPercent = (centerCoord.y / HANGMAN_HEIGHT_REF) * 100;
+            hangmanWrapper.style.transformOrigin = `${originXPercent}% ${originYPercent}%`;
+            
+            applyHangedManClips();
+            setupGameElements();
+        }
+
+        function applyAreaStyles(element, percentages) {
+            element.style.left = percentages.left + '%';
+            element.style.top = percentages.top + '%';
+            element.style.width = percentages.width + '%';
+            element.style.height = percentages.height + '%';
+        }
+
+        function applyHangedManClips() {
+            for (const partName in hangmanCoordinates) {
+                if (partName === 'container2' || partName === 'center') continue; 
+
+                const elementId = partElementIds[partName];
+                const element = document.getElementById(elementId);
+                
+                if (element) {
+                    const clipPath = getClipPathForCoord(hangmanCoordinates[partName]);
+                    element.style.clipPath = clipPath;
+                    
+                    if (partName === 'fixedBeam') {
+                        element.style.display = 'block';
+                        element.style.opacity = '1';
+                        element.style.animation = 'none';
+                    }
+                }
+            }
+        }
+
+        function setupGameElements() {
+            const lettersPercentages = calculateRelativePercentages().letters;
+            wordDisplayContainer.style.left = lettersPercentages.left + '%';
+            wordDisplayContainer.style.top = lettersPercentages.top + '%';
+            wordDisplayContainer.style.width = lettersPercentages.width + '%';
+            wordDisplayContainer.style.height = lettersPercentages.height + '%';
+            
+            // Ρύθμιση θέσης scrolling text (πάνω από το letters area)
+            scrollingTextContainer.style.left = lettersPercentages.left + '%';
+            scrollingTextContainer.style.top = (lettersPercentages.top - 10) + '%';
+            scrollingTextContainer.style.width = lettersPercentages.width + '%';
+            scrollingTextContainer.style.height = '60px';
+            
+            const alphabetPercentages = calculateRelativePercentages().alphabet;
+            keyboardContainer.style.left = alphabetPercentages.left + '%';
+            keyboardContainer.style.top = alphabetPercentages.top + '%';
+            keyboardContainer.style.width = alphabetPercentages.width + '%';
+            keyboardContainer.style.height = alphabetPercentages.height + '%';
+            
+            const scorePercentages = calculateRelativePercentages().score;
+            gameStatus.style.left = scorePercentages.left + '%';
+            gameStatus.style.top = scorePercentages.top + '%';
+            gameStatus.style.width = scorePercentages.width + '%';
+            gameStatus.style.height = scorePercentages.height + '%';
+            
+            // Ρύθμιση θέσης game over buttons (κάτω από το score area)
+            gameOverButtons.style.left = scorePercentages.left + '%';
+            gameOverButtons.style.top = (scorePercentages.top + scorePercentages.height + 10) + '%';
+            gameOverButtons.style.width = scorePercentages.width + '%';
+        }
+
+        // ΣΥΝΑΡΤΗΣΕΙΣ ΠΑΙΧΝΙΔΙΟΥ ΚΡΕΜΑΛΑ
+        function getRandomWordIndex() {
+            // Αν έχουν χρησιμοποιηθεί όλες οι λέξεις, επαναφορά
+            if (availableIndices.length === 0) {
+                availableIndices = [...Array(wordData.length).keys()];
+                usedWordIndices = [];
+            }
+            
+            // Επιλογή τυχαίου index από τα διαθέσιμα
+            const randomIndex = Math.floor(Math.random() * availableIndices.length);
+            const wordIndex = availableIndices[randomIndex];
+            
+            // Αφαίρεση του επιλεγμένου index από τα διαθέσιμα
+            availableIndices.splice(randomIndex, 1);
+            
+            // Προσθήκη στους χρησιμοποιημένους
+            usedWordIndices.push(wordIndex);
+            
+            return wordIndex;
+        }
+
+        function initGame() {
+            const wordIndex = getRandomWordIndex();
+            gameState.selectedWordData = wordData[wordIndex];
+            gameState.selectedWord = gameState.selectedWordData.word;
+            gameState.selectedWordNormalized = normalizeGreekText(gameState.selectedWord);
+            
+            gameState.guessedLetters = [];
+            gameState.wrongAttempts = 0;
+            gameState.gameOver = false;
+            gameState.currentError = 0;
+            gameState.isPlaying = true;
+            gameState.hasWon = false;
+            gameState.hasLost = false;
+            
+            resetHangman();
+            
+            updateWordDisplay();
+            updateAttempts();
+            updateUsedLetters();
+            message.textContent = '';
+            message.className = 'message';
+            
+            // Επαναφορά της εμφάνισης
+            wordDisplay.style.display = 'flex';
+            explanationDisplay.style.display = 'none';
+            scrollingTextContainer.style.display = 'none';
+            gameOverButtons.style.display = 'none';
+            
+            createKeyboard();
+            
+            lostText.style.display = 'none';
+            winText.style.display = 'none';
+            winImage.classList.remove('visible', 'move-right');
+        }
+
+        function createKeyboard() {
+            keyboard.innerHTML = '';
+            
+            for (let letter of greekAlphabet) {
+                const button = document.createElement('button');
+                button.className = 'letter-btn';
+                button.textContent = letter;
+                button.onclick = () => guessLetter(letter);
+                keyboard.appendChild(button);
+            }
+        }
+
+        function guessLetter(letter) {
+            if (gameState.gameOver || gameState.guessedLetters.includes(letter)) return;
+            
+            gameState.guessedLetters.push(letter);
+            updateUsedLetters();
+            
+            const button = Array.from(keyboard.children).find(btn => btn.textContent === letter);
+            
+            if (gameState.selectedWordNormalized.includes(letter)) {
+                button.classList.add('correct');
+                message.textContent = 'Σωστό!';
+                message.className = 'message';
+            } else {
+                button.classList.add('wrong');
+                gameState.wrongAttempts++;
+                gameState.currentError = gameState.wrongAttempts;
+                message.textContent = 'Λάθος!';
+                message.className = 'message';
+                updateAttempts();
+                showHangmanPart(gameState.wrongAttempts);
+            }
+            
+            updateWordDisplay();
+            checkGameStatus();
+        }
+
+        function updateWordDisplay() {
+            const wordDisplayElement = document.getElementById('wordDisplay');
+            wordDisplayElement.innerHTML = '';
+            
+            const wordParts = gameState.selectedWord.split(' ');
+            
+            if (wordParts.length > 1) {
+                // Πολύ-λεκτική φράση: κάθε λέξη σε ξεχωριστή σειρά
+                wordParts.forEach(word => {
+                    const row = document.createElement('div');
+                    row.className = 'word-row';
+                    
+                    for (let i = 0; i < word.length; i++) {
+                        const originalChar = word[i];
+                        const normalizedChar = normalizeGreekText(originalChar);
+                        const charSpan = document.createElement('span');
+                        
+                        if (gameState.guessedLetters.includes(normalizedChar)) {
+                            charSpan.textContent = originalChar + ' ';
+                        } else {
+                            charSpan.textContent = '_ ';
+                        }
+                        
+                        row.appendChild(charSpan);
+                    }
+                    wordDisplayElement.appendChild(row);
+                });
+            } else {
+                // Μία λέξη
+                const row = document.createElement('div');
+                row.className = 'word-row';
+                
+                for (let i = 0; i < gameState.selectedWord.length; i++) {
+                    const originalChar = gameState.selectedWord[i];
+                    const normalizedChar = normalizeGreekText(originalChar);
+                    const charSpan = document.createElement('span');
+                    
+                    if (gameState.guessedLetters.includes(normalizedChar)) {
+                        charSpan.textContent = originalChar + ' ';
+                    } else {
+                        charSpan.textContent = '_ ';
+                    }
+                    
+                    row.appendChild(charSpan);
+                }
+                wordDisplayElement.appendChild(row);
+            }
+        }
+
+        function updateAttempts() {
+            attempts.textContent = 7 - gameState.wrongAttempts;
+        }
+
+        function updateUsedLetters() {
+            const wrongLetters = gameState.guessedLetters.filter(letter => 
+                !gameState.selectedWordNormalized.includes(letter)
+            );
+            usedLetters.textContent = wrongLetters.join(', ');
+        }
+
+        function checkGameStatus() {
+            const wordWithoutSpaces = gameState.selectedWordNormalized.replace(/\s/g, '');
+            const guessedWithoutSpaces = gameState.guessedLetters.filter(letter => 
+                wordWithoutSpaces.includes(letter)
+            );
+            
+            const won = wordWithoutSpaces.split('').every(letter => 
+                guessedWithoutSpaces.includes(letter)
+            );
+            
+            if (won) {
+                message.textContent = 'Συγχαρητήρια! Κέρδισες!';
+                message.className = 'message win';
+                gameState.gameOver = true;
+                gameState.hasWon = true;
+                winGame();
+                return;
+            }
+            
+            if (gameState.wrongAttempts >= 7) {
+                message.textContent = `Έχασες! Η λέξη ήταν: ${gameState.selectedWord}`;
+                message.className = 'message lose';
+                gameState.gameOver = true;
+                gameState.hasLost = true;
+                loseGame();
+                
+                // Εμφάνιση ολόκληρης της λέξης
+                const wordDisplayElement = document.getElementById('wordDisplay');
+                wordDisplayElement.innerHTML = '';
+                
+                const wordParts = gameState.selectedWord.split(' ');
+                
+                if (wordParts.length > 1) {
+                    wordParts.forEach(word => {
+                        const row = document.createElement('div');
+                        row.className = 'word-row';
+                        
+                        for (let i = 0; i < word.length; i++) {
+                            const charSpan = document.createElement('span');
+                            charSpan.textContent = word[i] + ' ';
+                            row.appendChild(charSpan);
+                        }
+                        wordDisplayElement.appendChild(row);
+                    });
+                } else {
+                    const row = document.createElement('div');
+                    row.className = 'word-row';
+                    
+                    for (let i = 0; i < gameState.selectedWord.length; i++) {
+                        const charSpan = document.createElement('span');
+                        charSpan.textContent = gameState.selectedWord[i] + ' ';
+                        row.appendChild(charSpan);
+                    }
+                    wordDisplayElement.appendChild(row);
+                }
+            }
+        }
+
+        // ΣΥΝΑΡΤΗΣΕΙΣ HANGMAN ANIMATION
+        function showHangmanPart(errorNumber) {
+            if (errorNumber > 0 && errorNumber <= errorPartsSequence.length) {
+                const partId = errorPartsSequence[errorNumber - 1];
+                const partElement = document.getElementById(partId);
+                
+                if (partElement) {
+                    partElement.style.display = 'block';
+                    setTimeout(() => {
+                        partElement.style.opacity = '1';
+                    }, 10);
+                }
+            }
+        }
+
+        function resetHangman() {
+            gameState.isSwinging = false;
+            hangmanWrapper.classList.remove('swinging', 'swinging-initial', 'fade-out');
+            hangmanWrapper.style.transform = 'rotate(0deg)';
+            
+            errorPartsSequence.forEach(partId => {
+                const partElement = document.getElementById(partId);
+                if (partElement) {
+                    partElement.style.display = 'none';
+                    partElement.style.opacity = '0';
+                }
+            });
+            
+            const fixedBeam = document.getElementById('fixedBeamPart');
+            if (fixedBeam) {
+                fixedBeam.style.display = 'block';
+                fixedBeam.style.opacity = '1';
+            }
+        }
+
+        function loseGame() {
+            if (!gameState.isPlaying) return;
+            
+            gameState.isPlaying = false;
+            gameState.isSwinging = true;
+            
+            hangmanWrapper.style.transform = 'rotate(0deg)';
+            hangmanWrapper.classList.add('swinging-initial');
+            
+            setTimeout(() => {
+                lostText.style.display = 'block';
+            }, 500);
+            
+            setTimeout(() => {
+                hangmanWrapper.classList.remove('swinging-initial');
+                hangmanWrapper.classList.add('swinging');
+                // Εμφάνιση των κουμπιών μετά το swinging animation
+                setTimeout(() => {
+                    gameOverButtons.style.display = 'flex';
+                }, 1000);
+            }, 1000);
+        }
+
+        function winGame() {
+            if (!gameState.isPlaying) return;
+            
+            gameState.isPlaying = false;
+            
+            // Κρύβουμε το hangman
+            hangmanWrapper.classList.remove('swinging', 'swinging-initial');
+            hangmanWrapper.classList.add('fade-out');
+            
+            // Εμφανίζουμε το scrolling text με τη λέξη
+            scrollingText.textContent = gameState.selectedWord + " - " + gameState.selectedWord + " - " + gameState.selectedWord + " - " + gameState.selectedWord;
+            scrollingTextContainer.style.display = 'block';
+            
+            // Κρύβουμε το word display και εμφανίζουμε την επεξήγηση
+            wordDisplay.style.display = 'none';
+            explanationDisplay.textContent = gameState.selectedWordData.explanation;
+            explanationDisplay.style.display = 'block';
+            
+            // Προσθέτουμε μερικά ακόμα effects
+            setTimeout(() => {
+                winImage.classList.add('visible');
+                winImage.classList.add('move-right');
+                winText.style.display = 'block';
+                const timestamp = new Date().getTime();
+                winImage.src = 'https://github.com/conchr/Hangman-Original/raw/main/Hangman%20run.gif?' + timestamp;
+                
+                // Εμφάνιση των κουμπιών μετά από λίγο
+                setTimeout(() => {
+                    gameOverButtons.style.display = 'flex';
+                }, 1000);
+            }, 1000);
+        }
+
+        function resetGame() {
+            initGame();
+        }
+
+        function playAgain() {
+            initGame();
+        }
+
+        function returnToGames() {
+            window.location.href = 'https://conchr.github.io/Games/';
+        }
+
+        // Cross-fade animation
+        function startCrossFade() {
+            // Fade out του splash screen
+            splashScreen.classList.add('fade-out');
+            
+            // Ταυτόχρονα fade in του game container
+            setTimeout(() => {
+                imageContainer.classList.add('fade-in');
+            }, 300);
+            
+            // Απόκρυψη του splash screen μετά το animation
+            setTimeout(() => {
+                splashScreen.style.display = 'none';
+                applyRelativePercentages();
+            }, 1800);
+        }
+
+        // EVENT LISTENERS
+        window.addEventListener('resize', applyRelativePercentages);
+        backgroundImage.addEventListener('load', applyRelativePercentages);
+
+        document.addEventListener('keydown', function(event) {
+            if (gameState.gameOver) return;
+            
+            const key = event.key.toLowerCase();
+            if (greekAlphabet.includes(key)) {
+                guessLetter(key);
+            }
+        });
+
+        // ΑΡΧΙΚΟΠΟΙΗΣΗ
+        setTimeout(() => {
+            startCrossFade();
+        }, 3000);
+
+        window.onload = function() {
+            initGame();
+        };
+    </script>
+</body>
+</html>
